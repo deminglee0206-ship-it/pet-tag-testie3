@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pawtap</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F4F0FF;--ink:#2B2358;--mut:#7A72A6;--pink:#FF7A9C;--butter:#FFD66B;--line:#E3DCFA}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(#F4F0FF,#FDEFF4) fixed;min-height:100vh;color:var(--ink);font:16px/1.5 "DM Sans",system-ui,sans-serif}
+h1,h2,h3,.logo{font-family:Fredoka,system-ui,sans-serif;margin:0}
+h2{font-size:21px;margin-bottom:10px}
+.wrap{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top,0px)) 16px 60px}
+.top{display:flex;justify-content:space-between;align-items:center;padding:6px 0 14px}
+.logo{display:flex;gap:8px;align-items:center;font-size:23px;font-weight:600;color:var(--ink);text-decoration:none}
+.card{background:#fff;border-radius:24px;padding:18px;margin:0 0 14px;box-shadow:0 6px 24px rgba(80,60,160,.08)}
+.btn{display:block;width:100%;border:0;border-radius:999px;padding:14px 18px;font:700 16px "DM Sans",sans-serif;cursor:pointer;text-align:center;text-decoration:none;background:var(--pink);color:#fff;margin-top:8px}
+.btn.sec{background:var(--ink)}.btn.soft{background:#EFE9FF;color:var(--ink)}
+.btn.warn{background:#fff;color:#C23B5E;border:2px solid #F7C0CF}
+.btn.sm{display:inline-block;width:auto;padding:8px 14px;font-size:14px;margin:4px 4px 0 0}
+.btn:focus-visible,input:focus,textarea:focus{outline:3px solid var(--butter)}
+input,textarea{width:100%;padding:12px 14px;border:2px solid var(--line);border-radius:16px;font:inherit;color:var(--ink);background:#FBF9FF;margin:4px 0 12px}
+label{font-size:14px;color:var(--mut);font-weight:500}
+.avatar{width:132px;height:132px;border-radius:44% 56% 52% 48%/50% 46% 54% 50%;background:var(--butter);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font:600 56px Fredoka,sans-serif;overflow:hidden;border:5px solid #fff;box-shadow:0 6px 20px rgba(255,122,156,.25)}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.lost{background:linear-gradient(135deg,#FF7A9C,#FF9E7A);color:#fff;border-radius:22px;padding:14px 16px;margin-bottom:14px;font-weight:700}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:#EFE9FF;margin-right:4px}
+.pill.on{background:#FFE3EA;color:#C23B5E}
+.row{padding:9px 0;border-top:1px dashed var(--line)}.row:first-of-type{border:0}
+.row b{display:block;font-size:13px;color:var(--mut);font-weight:500}
+.msg{padding:12px 14px;border-radius:16px;background:#E9F3FF;margin:10px 0;font-size:15px}
+.msg.err{background:#FFE3EA}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:#F8F5FF;border-radius:18px;padding:10px;text-align:center}.stat b{font:600 26px Fredoka,sans-serif;display:block}
+table{width:100%;border-collapse:collapse;font-size:12.5px}td,th{padding:6px 3px;border-top:1px solid var(--line);text-align:left;word-break:break-all}
+.mono{font-family:ui-monospace,monospace}.center{text-align:center}.mut{color:var(--mut);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top" id="top"></div>
+  <div id="app"></div>
+</div>
+
+<script>
+const BRAND="Pawtap", ADMIN_PW="admin123";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const paw='<svg width="30" height="30" viewBox="0 0 32 32"><g fill="#FF7A9C"><ellipse cx="8" cy="13" rx="3.2" ry="4"/><ellipse cx="14" cy="8" rx="3.2" ry="4.2"/><ellipse cx="22" cy="8" rx="3.2" ry="4.2"/><ellipse cx="28" cy="13" rx="3.2" ry="4"/><path d="M18 15c5 0 9 5 8 9-1 3-4 3-8 2-4 1-7 1-8-2-1-4 3-9 8-9z"/></g></svg>';
+let db={},photoData=null;
+const save=()=>localStorage.setItem("pt_db",JSON.stringify(db));
+const rnd=(n,al)=>{const a=new Uint32Array(n);crypto.getRandomValues(a);return[...a].map(x=>al[x%al.length]).join("")};
+function newTag(){let c;do{c=rnd(8,"abcdefghjkmnpqrstuvwxyz23456789")}while(db.tags[c]);db.tags[c]={code:c,pin:rnd(6,"0123456789"),status:"inactive",created:Date.now()};return c}
+function init(){try{db=JSON.parse(localStorage.getItem("pt_db"))}catch(e){}
+  if(!db||!db.tags){db={tags:{},owners:{},notes:[],session:null};for(let i=0;i<3;i++)newTag();save()}}
+init();
+const base=()=>location.href.split("#")[0];
+const tagUrl=c=>base()+"#/t/"+c;
+const fmt=n=>new Date(n).toLocaleString();
+
+/* ---------- photo ---------- */
+function bindPhoto(){const f=$("#photo");if(!f)return;f.onchange=()=>{const file=f.files[0];if(!file)return;const img=new Image();
+  img.onload=()=>{const k=Math.min(1,300/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=img.width*k;c.height=img.height*k;
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);photoData=c.toDataURL("image/jpeg",.8);$("#prev").src=photoData;$("#prev").style.display="block"};img.src=URL.createObjectURL(file)}}
+
+/* ---------- shared pieces ---------- */
+const avatar=p=>'<div class="avatar">'+(p.photo?'<img src="'+p.photo+'" alt="">':esc((p.name||"?")[0].toUpperCase()))+'</div>';
+const fld=(id,l,v,ph,area)=>'<label>'+l+(area?'<textarea id="'+id+'" rows="2" placeholder="'+ph+'">'+esc(v)+'</textarea>':'<input id="'+id+'" value="'+esc(v)+'" placeholder="'+ph+'">')+'</label>';
+function petForm(p){p=p||{};return fld("p_name","宠物姓名 Name",p.name,"例如 Mochi")+fld("p_sub","品种 / 年龄",p.sub,"Golden Retriever · 3岁")+
+ '<label>照片 Photo<input id="photo" type="file" accept="image/*"></label><img id="prev" alt="" style="display:'+(p.photo?"block":"none")+';width:90px;height:90px;border-radius:50%;object-fit:cover;margin:-4px 0 12px" src="'+(p.photo||"")+'">'+
+ fld("p_allergies","过敏 Allergies",p.allergies,"例如 鸡肉")+fld("p_conditions","长期病症 Conditions",p.conditions,"例如 心脏杂音")+
+ fld("p_vaccines","疫苗 Vaccinations",p.vaccines,"例如 狂犬病 2025-10")+fld("p_vet","兽医 Vet",p.vet,"诊所名称 + 电话")+fld("p_notes","性格 / 备注 Notes",p.notes,"例如 怕大声",1)}
+function readPet(old){const g=i=>$("#"+i).value.trim();return{name:g("p_name"),sub:g("p_sub"),photo:photoData||(old&&old.photo)||"",allergies:g("p_allergies"),conditions:g("p_conditions"),vaccines:g("p_vaccines"),vet:g("p_vet"),notes:g("p_notes")}}
+function show(h,top){$("#app").innerHTML=h;photoData=null;bindPhoto();window.scrollTo(0,0);
+  $("#top").innerHTML=top===false?'<a class="logo" href="#/">'+paw+BRAND+'</a>':'<a class="logo" href="#/">'+paw+BRAND+'</a><span><a class="btn sm soft" href="#/owner">车主</a><a class="btn sm soft" href="#/admin">管理</a></span>'}
+const flash=(id,t,err)=>{$("#"+id).innerHTML='<div class="msg'+(err?" err":"")+'">'+t+'</div>'};
+
+/* ---------- pages ---------- */
+function home(){const demo=Object.values(db.tags).filter(t=>t.status==="inactive").slice(0,3);
+ show('<div class="card center"><div class="avatar">🐾</div><h1 style="font-size:30px">'+BRAND+'</h1><p class="mut">Tap the tag, bring them home.<br>碰一下，带它回家。</p></div>'+
+ '<div class="card"><h2>模拟碰芯片</h2><p class="mut">真实使用时，手机碰芯片会直接打开下面的网址。这里可手动输入编码来测试。</p><label>标签编码<input id="code" class="mono" placeholder="例如 k7qm9xp2"></label><button class="btn" onclick="A.go()">打开这个标签</button></div>'+
+ '<div class="card"><h2>演示用：未激活的新标签</h2><p class="mut">激活时需要编码旁边的 PIN（相当于包装里的激活卡）。正式版不会公开显示 PIN。</p>'+
+ (demo.map(t=>'<div class="row"><span class="mono">'+t.code+'</span> · PIN <b class="mono" style="display:inline">'+t.pin+'</b> <a class="btn sm soft" href="#/t/'+t.code+'">碰一下</a></div>').join("")||'<p class="mut">已全部激活。到「管理」生成更多。</p>')+'</div>'+
+ '<div class="card mut">⚠️ 这是演示版：所有资料只保存在这部手机/电脑的浏览器里，换一部手机看不到。正式版会接上真正的数据库。管理密码：<b>'+ADMIN_PW+'</b></div>')}
+
+// Normalize Malaysian numbers for WhatsApp / tel links. The number is never printed on the public page.
+function normalizePhone(value){
+ const raw=String(value||"").trim(), digits=raw.replace(/\D/g,"");
+ if(!digits)return "";
+ if(raw.startsWith("+"))return digits;
+ if(digits.startsWith("60"))return digits;
+ if(digits.startsWith("0"))return "60"+digits.slice(1);
+ return digits;
+}
+
+function tagPage(code){const t=db.tags[code];
+ if(!t)return show('<div class="card center"><h2>找不到这个标签</h2><p class="mut">编码可能输入错误，或标签已被停用。</p><a class="btn" href="#/">回首页</a></div>',false);
+ if(t.status==="inactive")return show('<div class="card center"><div class="avatar">🎀</div><h2>欢迎！激活你的 '+BRAND+'</h2><p class="mut">输入包装卡上的 6 位 PIN，再填写宠物资料。</p></div><div class="card">'+
+  fld("pin","激活 PIN",'',"6 位数字")+'<h2>车主资料</h2>'+fld("o_email","邮箱 Email",'',"you@email.com")+'<label>密码<input id="o_pass" type="password" placeholder="至少 6 位"></label>'+fld("o_phone","WhatsApp 号码（仅你可见）",'',"60123456789")+
+  '<h2>宠物资料</h2>'+petForm()+'<div id="fb"></div><button class="btn" onclick="A.activate(\''+code+'\')">激活</button></div>',false);
+ const p=t.pet,o=db.owners[t.ownerId],ph=normalizePhone((o||{}).phone),mine=db.session&&db.session===t.ownerId,rows=[["过敏 Allergies",p.allergies],["长期病症 Conditions",p.conditions],["疫苗 Vaccinations",p.vaccines],["兽医 Vet",p.vet],["性格 / 备注",p.notes]].filter(r=>r[1]);
+ show((mine?'<div class="msg">你是 '+esc(p.name)+' 的主人。<a href="#/owner/'+code+'"><b>编辑资料 / 走失模式</b></a></div>':"")+
+  (t.lost?'<div class="lost">🚨 我走失了！请帮我联络主人。'+(t.reward?'<br><span style="font-weight:500">'+esc(t.reward)+'</span>':"")+'</div>':"")+
+  '<div class="card center">'+avatar(p)+'<h1 style="font-size:38px">'+esc(p.name)+'</h1><div class="mut">'+esc(p.sub)+'</div></div>'+
+  '<div class="card"><h2>联络主人</h2><p class="mut">主人的电话号码不会公开显示。点按钮可直接打开 WhatsApp 或拨号；发送位置前，浏览器会先征求你的位置授权，并通过 WhatsApp 把地图链接发给主人。</p><label>想说的话（可不填，会附在 WhatsApp 讯息里）<textarea id="fmsg" rows="2" placeholder="例如：我在巴刹门口，狗狗很乖"></textarea></label>'+
+  (ph?'<button class="btn" onclick="A.wa(\''+code+'\',0)">WhatsApp 主人</button><a class="btn sec" href="tel:+'+ph+'">Call / 打电话给主人</a><button class="btn soft" onclick="A.wa(\''+code+'\',1)">📍 发送我的位置给主人（WhatsApp）</button>':'<div class="msg err">主人还没有填写联络号码。</div>')+'<div id="fb"></div></div>'+
+  '<div class="card"><h2>健康与病史</h2>'+(rows.map(r=>'<div class="row"><b>'+r[0]+'</b>'+esc(r[1])+'</div>').join("")||'<p class="mut">主人暂未填写。</p>')+'</div>',false)}
+
+function ownerPage(code){const o=db.owners[db.session];
+ if(!o)return show('<div class="card"><h2>车主登录</h2><label>邮箱<input id="l_email"></label><label>密码<input id="l_pass" type="password"></label><div id="fb"></div><button class="btn" onclick="A.login()">登录</button><p class="mut">新车主：请先碰一下芯片完成激活。</p></div>');
+ const mine=Object.values(db.tags).filter(t=>t.ownerId===o.id);
+ if(!mine.length)return show('<div class="card"><h2>还没有绑定的宠物</h2><p class="mut">碰芯片并激活后会出现在这里。</p><button class="btn soft" onclick="A.logout()">退出</button></div>');
+ const t=mine.find(x=>x.code===code)||mine[0],p=t.pet,notes=db.notes.filter(n=>n.code===t.code).reverse();
+ show('<div class="card"><h2>你好，'+esc(o.email)+'</h2>'+mine.map(x=>'<a class="btn sm '+(x.code===t.code?"":"soft")+'" href="#/owner/'+x.code+'">'+esc(x.pet.name)+(x.lost?" 🚨":"")+'</a>').join("")+'<button class="btn sm warn" onclick="A.logout()">退出</button></div>'+
+ '<div class="card"><h2>走失模式 '+(t.lost?'<span class="pill on">已开启</span>':'<span class="pill">关闭</span>')+'</h2><p class="mut">开启后，别人碰芯片会先看到醒目的走失提示。</p>'+fld("reward","走失时显示的留言 / 奖励",t.reward,"例如 重谢！请尽快联络",1)+
+ '<button class="btn '+(t.lost?"soft":"")+'" onclick="A.lost(\''+t.code+'\','+(!t.lost)+')">'+(t.lost?"宠物已找回，关闭走失模式":"我的宠物走失了，开启")+'</button></div>'+
+ '<div class="card"><h2>编辑宠物资料</h2>'+petForm(p)+fld("o_phone","你的 WhatsApp 号码（仅你可见）",o.phone,"60123456789")+'<div id="fb"></div><button class="btn" onclick="A.savePet(\''+t.code+'\')">保存</button><a class="btn soft" href="#/t/'+t.code+'">预览别人看到的页面</a></div>'+
+ '<div class="card"><h2>收到的通知（'+notes.length+'）</h2>'+(notes.map(n=>'<div class="row"><b>'+fmt(n.time)+'</b>'+esc(n.msg||"（没有留言）")+(n.lat?'<br><a href="https://www.google.com/maps?q='+n.lat+','+n.lng+'" target="_blank" rel="noopener">📍 查看位置（误差约 '+n.acc+' 米）</a>':"")+'</div>').join("")||'<p class="mut">暂时没有。真实版本会同时推送到你的 WhatsApp / 邮件。</p>')+'</div>'+
+ '<div class="card"><h2>标签管理</h2><p class="mut">标签网址：<span class="mono">'+tagUrl(t.code)+'</span></p><button class="btn warn" onclick="A.release(\''+t.code+'\')">停用 / 转让这个标签</button><p class="mut">会清除宠物资料，标签变回未激活，新主人可用 PIN 重新激活。</p></div>')}
+
+function adminPage(){if(sessionStorage.adm!=="1")return show('<div class="card"><h2>管理员登录</h2><label>密码<input id="a_pw" type="password"></label><div id="fb"></div><button class="btn sec" onclick="A.adminLogin()">进入</button></div>');
+ const ts=Object.values(db.tags).sort((a,b)=>b.created-a.created),on=ts.filter(t=>t.status==="active");
+ show('<div class="card"><h2>总览</h2><div class="grid"><div class="stat"><b>'+ts.length+'</b>标签总数</div><div class="stat"><b>'+on.length+'</b>已激活</div><div class="stat"><b>'+on.filter(t=>t.lost).length+'</b>走失中</div><div class="stat"><b>'+db.notes.length+'</b>通知次数</div></div></div>'+
+ '<div class="card"><h2>批量生成标签</h2><label>数量<input id="n" type="number" value="10" min="1" max="500"></label><button class="btn" onclick="A.gen()">生成</button><button class="btn soft" onclick="A.csv()">下载 CSV（写芯片用）</button><p class="mut">CSV 含每个标签的网址和 PIN。PIN 印在激活卡上。</p></div>'+
+ '<div class="card"><h2>全部标签</h2><div style="overflow-x:auto"><table><tr><th>编码</th><th>PIN</th><th>状态</th><th>主人</th></tr>'+ts.map(t=>'<tr><td class="mono"><a href="#/t/'+t.code+'">'+t.code+'</a></td><td class="mono">'+t.pin+'</td><td>'+(t.status==="active"?(t.lost?"🚨走失":"已激活"):"未激活")+'</td><td>'+esc((db.owners[t.ownerId]||{}).email||"-")+'</td></tr>').join("")+'</table></div></div>'+
+ '<div class="card"><button class="btn warn" onclick="A.reset()">清空所有演示数据</button></div>')}
+
+/* ---------- actions ---------- */
+const A={
+ go(){const c=$("#code").value.trim().toLowerCase();if(c)location.hash="/t/"+c},
+ activate(code){const t=db.tags[code],v=i=>$("#"+i).value.trim(),email=v("o_email").toLowerCase(),pass=$("#o_pass").value;
+  if(v("pin")!==t.pin)return flash("fb","PIN 不正确，请看包装卡。",1);
+  if(!email.includes("@")||pass.length<6)return flash("fb","请填写有效邮箱，密码至少 6 位。",1);
+  const pet=readPet();if(!pet.name)return flash("fb","请填写宠物姓名。",1);
+  let o=Object.values(db.owners).find(x=>x.email===email);
+  if(o&&o.pass!==pass)return flash("fb","这个邮箱已注册，密码不对。",1);
+  if(!o){o={id:"o"+rnd(8,"abcdefghjkmnpqrstuvwxyz23456789"),email,pass,phone:""};db.owners[o.id]=o}
+  o.phone=v("o_phone");Object.assign(t,{status:"active",ownerId:o.id,pet,lost:false,reward:"",activated:Date.now()});db.session=o.id;save();location.hash="/t/"+code;route()},
+ login(){const e=$("#l_email").value.trim().toLowerCase(),p=$("#l_pass").value,o=Object.values(db.owners).find(x=>x.email===e&&x.pass===p);
+  if(!o)return flash("fb","邮箱或密码不对。",1);db.session=o.id;save();route()},
+ logout(){db.session=null;save();location.hash="/";route()},
+ savePet(code){const t=db.tags[code],o=db.owners[t.ownerId],pet=readPet(t.pet);if(!pet.name)return flash("fb","宠物姓名不能为空。",1);
+  t.pet=pet;t.reward=$("#reward").value.trim();o.phone=$("#o_phone").value.trim();save();flash("fb","已保存 ✔")},
+ lost(code,on){const t=db.tags[code];t.lost=on;t.reward=$("#reward").value.trim();save();route()},
+ release(code){if(!confirm("确定停用？宠物资料会被清除。"))return;const t=db.tags[code];Object.assign(t,{status:"inactive",ownerId:null,pet:null,lost:false,reward:""});delete t.ownerId;save();location.hash="/owner";route()},
+ notify(code,withLoc){const t=db.tags[code],msg=$("#fmsg").value.trim();
+  if(Date.now()-(t.lastNotify||0)<120000)return flash("fb","刚刚已经通知过主人，请稍等两分钟再试。");
+  const done=(extra)=>{t.lastNotify=Date.now();db.notes.push(Object.assign({code,time:Date.now(),msg},extra));save();flash("fb","已通知主人，谢谢你！🐾")};
+  if(!withLoc)return done({});
+  if(!navigator.geolocation)return flash("fb","这个浏览器无法取得位置，请改用「通知主人」。",1);
+  flash("fb","正在取得位置，请按「允许」…");
+  navigator.geolocation.getCurrentPosition(p=>done({lat:p.coords.latitude.toFixed(6),lng:p.coords.longitude.toFixed(6),acc:Math.round(p.coords.accuracy)}),
+   e=>flash("fb",e.code===1?"位置权限被拒绝，请在浏览器设置允许后再试，或改用「通知主人」。":"暂时取不到位置，请到空旷处再试。",1),{enableHighAccuracy:true,timeout:15000,maximumAge:0})},
+ wa(code,withLoc){const t=db.tags[code],o=db.owners[t.ownerId],ph=normalizePhone(o&&o.phone),n=t.pet.name,m=( $("#fmsg").value||"").trim();
+  const go=l=>{const txt="你好，我在 "+n+" 的 Pawtap 吊牌上找到你的联络方式。"+(l?"\n📍 我现在的位置（点击地图查看）："+"https://www.google.com/maps?q="+l.lat+","+l.lng+"（定位误差约 "+l.acc+" 米）":"")+(m?"\n"+m:"")+"\nHi, I found "+n+"!";
+   db.notes.push({code,time:Date.now(),msg:m,lat:l&&l.lat,lng:l&&l.lng,acc:l&&l.acc});save();location.href="https://wa.me/"+ph+"?text="+encodeURIComponent(txt)};
+  if(!withLoc)return go(null);
+  if(!navigator.geolocation)return flash("fb","这个浏览器无法取得位置，请直接点「WhatsApp 主人」或打电话。",1);
+  flash("fb","正在取得位置，请按「允许」…");
+  navigator.geolocation.getCurrentPosition(p=>go({lat:p.coords.latitude.toFixed(6),lng:p.coords.longitude.toFixed(6),acc:Math.round(p.coords.accuracy)}),
+   e=>flash("fb",(e.code===1?"位置权限被拒绝，请在浏览器设置允许后再试。":"暂时取不到位置，请到空旷处再试。")+"也可以直接点「WhatsApp 主人」或打电话。",1),{enableHighAccuracy:true,timeout:15000,maximumAge:0})},
+ adminLogin(){if($("#a_pw").value!==ADMIN_PW)return flash("fb","密码不对。",1);sessionStorage.adm="1";route()},
+ gen(){const n=Math.min(500,Math.max(1,+$("#n").value||1));for(let i=0;i<n;i++)newTag();save();route()},
+ csv(){const r=["url,pin,code"].concat(Object.values(db.tags).filter(t=>t.status==="inactive").map(t=>tagUrl(t.code)+","+t.pin+","+t.code)),
+  a=document.createElement("a");a.href=URL.createObjectURL(new Blob([r.join("\n")],{type:"text/csv"}));a.download="tags.csv";a.click()},
+ reset(){if(confirm("清空全部演示数据？")){localStorage.removeItem("pt_db");sessionStorage.clear();init();location.hash="/";route()}}
+};
+
+/* ---------- router ---------- */
+function route(){const h=(location.hash.slice(1)||"/").split("/");
+ if(h[1]==="t")tagPage(h[2]);else if(h[1]==="owner")ownerPage(h[2]);else if(h[1]==="admin")adminPage();else home()}
+window.addEventListener("hashchange",route);route();
+</script>
+</body>
+</html>
